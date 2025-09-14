@@ -1,0 +1,86 @@
+# email_validator_service.py
+import re
+import smtplib
+import dns.resolver
+
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+
+
+class EmailValidator:
+    """Utility class to validate emails with format, DNS, and SMTP checks."""
+
+    def __init__(self, email):
+        self.email = email
+        self.domain = email.split("@")[-1]
+        self.result = {
+            "email": email,
+            "format_valid": False,
+            "mx_records_found": False,
+            "smtp_check": False,
+            "spf_record": None,
+            "dmarc_record": None,
+        }
+
+    def check_format(self):
+        """Check if email format is valid."""
+        self.result["format_valid"] = bool(EMAIL_REGEX.match(self.email))
+        return self.result["format_valid"]
+
+    def check_mx_records(self):
+        """Check if domain has MX records."""
+        try:
+            answers = dns.resolver.resolve(self.domain, "MX")
+            self.mx_records = [r.exchange.to_text() for r in answers]
+            self.result["mx_records_found"] = True if self.mx_records else False
+        except Exception:
+            self.result["mx_records_found"] = False
+        return self.result["mx_records_found"]
+
+    def check_smtp(self):
+        """Try connecting to mail server (basic verification)."""
+        if not getattr(self, "mx_records", None):
+            return False
+        try:
+            mx_host = self.mx_records[0]
+            server = smtplib.SMTP(timeout=5)
+            server.connect(mx_host)
+            server.helo("example.com")
+            code, _ = server.mail("test@example.com")
+            if code == 250:
+                code, _ = server.rcpt(self.email)
+                self.result["smtp_check"] = (code == 250 or code == 251)
+            server.quit()
+        except Exception:
+            self.result["smtp_check"] = False
+        return self.result["smtp_check"]
+
+    def check_spf_dmarc(self):
+        """Fetch SPF and DMARC DNS TXT records."""
+        try:
+            spf = dns.resolver.resolve(self.domain, "TXT")
+            for record in spf:
+                txt = record.to_text().strip('"')
+                if txt.startswith("v=spf1"):
+                    self.result["spf_record"] = txt
+        except Exception:
+            self.result["spf_record"] = None
+
+        try:
+            dmarc_domain = f"_dmarc.{self.domain}"
+            dmarc = dns.resolver.resolve(dmarc_domain, "TXT")
+            for record in dmarc:
+                txt = record.to_text().strip('"')
+                if txt.startswith("v=DMARC1"):
+                    self.result["dmarc_record"] = txt
+        except Exception:
+            self.result["dmarc_record"] = None
+
+    def validate(self):
+        """Run all checks in sequence."""
+        self.check_format()
+        if self.result["format_valid"]:
+            self.check_mx_records()
+            if self.result["mx_records_found"]:
+                self.check_smtp()
+            self.check_spf_dmarc()
+        return self.result
