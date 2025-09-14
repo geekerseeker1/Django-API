@@ -1,0 +1,7 @@
+# urls.py
+from django.urls import path
+from .views import validate_emails
+
+urlpatterns = [
+    path("api/validate-emails/", validate_emails, name="validate_emails"),
+]
