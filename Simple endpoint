@@ -1,0 +1,24 @@
+# views.py
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+from .email_validator_service import EmailValidator
+
+
+@csrf_exempt
+def validate_emails(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required"}, status=400)
+
+    try:
+        body = json.loads(request.body.decode("utf-8"))
+        emails = body.get("emails", [])
+    except Exception:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    results = []
+    for email in emails:
+        validator = EmailValidator(email)
+        results.append(validator.validate())
+
+    return JsonResponse({"results": results}, safe=False)
