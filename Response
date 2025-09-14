@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "email": "test@gmail.com",
+      "format_valid": true,
+      "mx_records_found": true,
+      "smtp_check": true,
+      "spf_record": "v=spf1 include:_spf.google.com ~all",
+      "dmarc_record": "v=DMARC1; p=none; rua=mailto:dmarc-reports@google.com"
+    },
+    {
+      "email": "fake@nodomain123.com",
+      "format_valid": true,
+      "mx_records_found": false,
+      "smtp_check": false,
+      "spf_record": null,
+      "dmarc_record": null
+    }
+  ]
+}
